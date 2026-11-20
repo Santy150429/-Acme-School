@@ -1,0 +1,341 @@
+
+<!DOCTYPE html>
+<html lang=es>
+<head>
+  <meta charset=UTF-8 />
+  <meta name=viewport content=width=device-width, initial-scale=1.0 />
+  <title>Acme School - Plataforma de Examenes</title>
+
+  <link rel=stylesheet href=css/variables.css />
+  <link rel=stylesheet href=css/main.css />
+  <link rel=stylesheet href=css/layout.css />
+  <link rel=stylesheet href=css/components.css />
+  <link rel=stylesheet href=css/animations.css />
+</head>
+<body>
+  <acme-navbar id=mainNavbar></acme-navbar>
+
+  <div id=alertContainer class=alert-container aria-live=polite></div>
+
+  <main class=main-container>
+
+    <!-- VISTA PUBLICA: RESOLUCION DE EXAMENES (SIN LOGIN) -->
+    <section id=view-quiz class=view active aria-labelledby=quizTitleHeading>
+      <div class=view-header>
+        <div>
+          <h1 id=quizTitleHeading class=view-title>Portal de Examenes - Acme School</h1>
+          <p class=view-subtitle>Selecciona un examen disponible, registra tus datos y responde las preguntas.</p>
+        </div>
+      </div>
+
+      <div id=quizCatalogStep>
+        <div id=availableExamsGrid class=cards-grid></div>
+      </div>
+
+      <div id=studentRegisterStep class=card form-card hidden>
+        <h2 class=card-title>Datos del Estudiante</h2>
+        <p class=card-description>
+          Examen seleccionado: <strong id=selectedExamLabel></strong>
+        </p>
+
+        <form id=studentForm class=form-grid novalidate>
+          <div class=form-group>
+            <label for=studentIdInput>Numero de identificacion *</label>
+            <input
+              type=text
+              id=studentIdInput
+              name=studentId
+              placeholder=Ej.-1098765432
+              required
+            />
+          </div>
+
+          <div class=form-group>
+            <label for=studentNameInput>Nombre completo *</label>
+            <input
+              type=text
+              id=studentNameInput
+              name=studentName
+              placeholder=Ej.-Maria-Fernanda-Gomez
+              required
+            />
+          </div>
+
+          <div class=form-actions full-width>
+            <button type=button id=cancelStudentBtn class=btn btn-secondary>
+              Volver a examenes
+            </button>
+            <button type=submit class=btn btn-primary>
+              Comenzar examen
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div id=activeExamStep class=hidden>
+        <div class=exam-runner-header card>
+          <div class=exam-meta-info>
+            <h2 id=runningExamTitle class=card-title></h2>
+            <div class=exam-badges>
+              <span id=runningExamTotalQuestions class=badge badge-info></span>
+              <span id=runningExamPassingScore class=badge badge-success></span>
+              <span id=runningStudentBadge class=badge badge-neutral></span>
+            </div>
+          </div>
+
+          <exam-timer id=examTimer></exam-timer>
+        </div>
+
+        <form id=examQuestionsForm novalidate>
+          <div id=examQuestionsList class=questions-stack></div>
+
+          <div class=exam-submit-bar card>
+            <p class=text-muted>Revisa tus respuestas antes de enviar. Solo puedes elegir una opcion por pregunta.</p>
+            <button type=submit id=finishExamBtn class=btn btn-primary btn-lg>
+              Terminar examen
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div id=examResultStep class=card result-card hidden>
+        <div id=resultBadgeStatus class=result-status-pill></div>
+        <h2 id=resultHeading class=card-title></h2>
+        <p id=resultStudentSummary class=card-description></p>
+
+        <div class=result-metrics>
+          <div class=metric-box>
+            <span class=metric-label>Porcentaje obtenido</span>
+            <strong id=resultScoreValue class=metric-value>0%</strong>
+          </div>
+          <div class=metric-box>
+            <span class=metric-label>Porcentaje requerido</span>
+            <strong id=resultPassingValue class=metric-value>0%</strong>
+          </div>
+          <div class=metric-box>
+            <span class=metric-label>Respuestas correctas</span>
+            <strong id=resultCorrectCount class=metric-value>0 / 0</strong>
+          </div>
+        </div>
+
+        <div class=form-actions>
+          <button type=button id=backToCatalogBtn class=btn btn-primary>
+            Volver a los examenes disponibles
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA PRIVADA: LOGIN -->
+    <section id=view-login class=view hidden aria-labelledby=loginHeading>
+      <div class=auth-wrapper>
+        <div class=card auth-card>
+          <h1 id=loginHeading class=card-title>Iniciar Sesion</h1>
+          <p class=card-description>
+            Acceso exclusivo para personal administrativo y docentes de Acme School.
+          </p>
+
+          <form id=loginForm class=form-stack novalidate>
+            <div class=form-group>
+              <label for=loginEmail>Correo electronico *</label>
+              <input
+                type=email
+                id=loginEmail
+                name=email
+                placeholder=admin@acme.edu
+                required
+              />
+            </div>
+
+            <div class=form-group>
+              <label for=loginPassword>Contrasena *</label>
+              <input
+                type=password
+                id=loginPassword
+                name=password
+                placeholder=Ingresa-tu-contrasena
+                required
+              />
+            </div>
+
+            <button type=submit class=btn btn-primary btn-block>
+              Ingresar al panel
+            </button>
+          </form>
+
+          <div class=helper-box>
+            <strong>Demo inicial:</strong> <code>admin@acme.edu</code> / <code>admin123</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA PRIVADA: GESTION DE USUARIOS (CRUD) -->
+    <section id=view-users class=view hidden aria-labelledby=usersHeading>
+      <div class=view-header>
+        <div>
+          <h1 id=usersHeading class=view-title>Gestion de Usuarios</h1>
+          <p class=view-subtitle>Crea, actualiza o elimina cuentas de administrativos y docentes.</p>
+        </div>
+      </div>
+
+      <div class=crud-layout>
+        <div class=card>
+          <h2 id=userFormTitle class=card-title>Registrar nuevo usuario</h2>
+          <form id=userForm class=form-stack novalidate>
+            <input type=hidden id=userEditingOriginalId />
+
+            <div class=form-group>
+              <label for=userIdNumber>Numero de identificacion *</label>
+              <input type=text id=userIdNumber name=idNumber placeholder=1011223344 required />
+            </div>
+
+            <div class=form-group>
+              <label for=userFullName>Nombre completo *</label>
+              <input type=text id=userFullName name=fullName placeholder=Laura-Camila-Ruiz required />
+            </div>
+
+            <div class=form-group>
+              <label for=userEmail>Correo electronico *</label>
+              <input type=email id=userEmail name=email placeholder=lruiz@acme.edu required />
+            </div>
+
+            <div class=form-group>
+              <label for=userPhone>Telefono *</label>
+              <input type=tel id=userPhone name=phone placeholder=3159876543 required />
+            </div>
+
+            <div class=form-group>
+              <label for=userRole>Cargo *</label>
+              <select id=userRole name=role required>
+                <option value=>Selecciona un cargo</option>
+                <option value=Administrativo>Administrativo</option>
+                <option value=Docente>Docente</option>
+              </select>
+            </div>
+
+            <div class=form-group>
+              <label for=userPassword>Contrasena *</label>
+              <input type=password id=userPassword name=password placeholder=Minimo-4-caracteres required />
+            </div>
+
+            <div class=form-actions>
+              <button type=submit id=saveUserBtn class=btn btn-primary>Guardar usuario</button>
+              <button type=button id=cancelUserEditBtn class=btn btn-secondary hidden>Cancelar</button>
+            </div>
+          </form>
+        </div>
+
+        <div class=card>
+          <h2 class=card-title>Usuarios registrados</h2>
+          <div class=table-responsive>
+            <table class=data-table>
+              <thead>
+                <tr>
+                  <th>Identificacion</th>
+                  <th>Nombre completo</th>
+                  <th>Email</th>
+                  <th>Telefono</th>
+                  <th>Cargo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id=usersTableBody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA PRIVADA: GESTION DE EXAMENES (CRUD) -->
+    <section id=view-exams class=view hidden aria-labelledby=examsHeading>
+      <div class=view-header>
+        <div>
+          <h1 id=examsHeading class=view-title>Gestion de Examenes</h1>
+          <p class=view-subtitle>Administra examenes, preguntas y opciones (una sola respuesta correcta por pregunta).</p>
+        </div>
+      </div>
+
+      <div class=exams-layout>
+        <div class=card>
+          <h2 id=examFormTitle class=card-title>Crear nuevo examen</h2>
+
+          <form id=examForm class=form-stack novalidate>
+            <input type=hidden id=examEditingOriginalCode />
+
+            <div class=form-grid>
+              <div class=form-group>
+                <label for=examCode>Codigo del examen *</label>
+                <input type=text id=examCode name=code placeholder=MAT-101 required />
+              </div>
+
+              <div class=form-group>
+                <label for=examTitle>Titulo del examen *</label>
+                <input type=text id=examTitle name=title placeholder=Algebra-Basica required />
+              </div>
+
+              <div class=form-group>
+                <label for=examTime>Tiempo (minutos) *</label>
+                <input type=number id=examTime name=timeMinutes min=1 max=300 placeholder=20 required />
+              </div>
+
+              <div class=form-group>
+                <label for=examPassingScore>Porcentaje de aprobacion (%) *</label>
+                <input type=number id=examPassingScore name=passingScore min=1 max=100 placeholder=70 required />
+              </div>
+            </div>
+
+            <div class=form-group>
+              <label for=examDescription>Descripcion del examen *</label>
+              <textarea
+                id=examDescription
+                name=description
+                rows=2
+                placeholder=Describe-brevemente-los-temas-evaluados
+                required
+              ></textarea>
+            </div>
+
+            <div class=question-builder-box>
+              <div class=question-builder-header>
+                <h3>Preguntas del examen</h3>
+                <button type=button id=addQuestionBtn class=btn btn-secondary btn-sm>
+                  + Agregar pregunta
+                </button>
+              </div>
+              <div id=questionBuilderList class=questions-stack></div>
+            </div>
+
+            <div class=form-actions>
+              <button type=submit id=saveExamBtn class=btn btn-primary>Guardar examen</button>
+              <button type=button id=cancelExamEditBtn class=btn btn-secondary hidden>Cancelar edicion</button>
+            </div>
+          </form>
+        </div>
+
+        <div class=card>
+          <h2 class=card-title>Examenes registrados</h2>
+          <div class=table-responsive>
+            <table class=data-table>
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Titulo</th>
+                  <th>Tiempo</th>
+                  <th>Aprobacion</th>
+                  <th>Preguntas</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id=examsTableBody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type=module src=js/app.js></script>
+</body>
+</html>

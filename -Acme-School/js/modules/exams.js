@@ -1,13 +1,18 @@
 
 import { obtenerExamenes, guardarExamenes } from "../storage/database.js";
+import { escapeHtml } from "../utils/escape.js";
 
-function crearPreguntaVacia(indice = 1) {
+function nuevoId(prefijo) {
+  return `${prefijo}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function crearPreguntaVacia() {
   return {
-    id: `preg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: nuevoId("preg"),
     texto: "",
     opciones: [
-      { id: `op-${indice}-1`, texto: "", correcta: true },
-      { id: `op-${indice}-2`, texto: "", correcta: false }
+      { id: nuevoId("op"), texto: "", correcta: true },
+      { id: nuevoId("op"), texto: "", correcta: false }
     ]
   };
 }
@@ -27,141 +32,138 @@ export function iniciarModuloExamenes(mostrarMensaje, alCambiarExamenes) {
   const aprobacionInput = document.getElementById("examen-aprobacion");
   const descripcionInput = document.getElementById("examen-descripcion");
 
-  let borradorPreguntas = [crearPreguntaVacia(1)];
+  let borradorPreguntas = [crearPreguntaVacia()];
+
+  function notificarCambio() {
+    if (typeof alCambiarExamenes === "function") alCambiarExamenes();
+  }
+
+  /* ---------- Constructor de preguntas ---------- */
 
   function renderConstructorPreguntas() {
-    contenedorPreguntas.innerHTML = "";
+    contenedorPreguntas.innerHTML = borradorPreguntas
+      .map((preg, p) => {
+        const opcionesHtml = preg.opciones
+          .map(
+            (op, o) => `
+              <div class="fila-opcion-editor">
+                <input type="text" class="input-opcion-texto"
+                  data-p="${p}" data-o="${o}"
+                  value="${escapeHtml(op.texto)}"
+                  placeholder="Descripción de la respuesta ${o + 1}"
+                  aria-label="Respuesta ${o + 1} de la pregunta ${p + 1}" />
+                <label class="etiqueta-correcta">
+                  <input type="radio" class="radio-opcion-correcta"
+                    name="correcta-preg-${p}" data-p="${p}" data-o="${o}"
+                    ${op.correcta ? "checked" : ""} />
+                  Correcta
+                </label>
+                ${
+                  preg.opciones.length > 2
+                    ? `<button type="button" class="btn btn-gris btn-pequeno" data-accion="quitar-opcion"
+                        data-p="${p}" data-o="${o}" aria-label="Quitar la respuesta ${o + 1}">X</button>`
+                    : ""
+                }
+              </div>
+            `
+          )
+          .join("");
 
-    borradorPreguntas.forEach((preg, pIndex) => {
-      const caja = document.createElement("div");
-      caja.className = "caja-pregunta-editor";
-
-      const opcionesHtml = preg.opciones
-        .map(
-          (op, oIndex) => `
-            <div class="fila-opcion-editor">
-              <input
-                type="text"
-                class="input-opcion-texto"
-                data-p="${pIndex}"
-                data-o="${oIndex}"
-                value="${op.texto}"
-                placeholder="Descripcion de respuesta ${oIndex + 1}"
-              />
-              <label style="font-size:0.82rem;display:flex;align-items:center;gap:3px;cursor:pointer;">
-                <input
-                  type="radio"
-                  name="correcta-preg-${pIndex}"
-                  class="radio-opcion-correcta"
-                  data-p="${pIndex}"
-                  data-o="${oIndex}"
-                  ${op.correcta ? "checked" : ""}
-                />
-                Correcta
-              </label>
-              ${
-                preg.opciones.length > 2
-                  ? `<button type="button" class="btn btn-gris btn-pequeno btn-quitar-opcion" data-p="${pIndex}" data-o="${oIndex}">X</button>`
-                  : ""
-              }
+        return `
+          <div class="caja-pregunta-editor">
+            <div class="fila-entre">
+              <strong>Pregunta ${p + 1}</strong>
+              <div>
+                <button type="button" class="btn btn-gris btn-pequeno" data-accion="agregar-opcion" data-p="${p}">+ Respuesta</button>
+                ${
+                  borradorPreguntas.length > 1
+                    ? `<button type="button" class="btn btn-rojo btn-pequeno" data-accion="quitar-pregunta" data-p="${p}">Quitar</button>`
+                    : ""
+                }
+              </div>
             </div>
-          `
-        )
-        .join("");
-
-      caja.innerHTML = `
-        <div class="fila-entre">
-          <strong>Pregunta ${pIndex + 1}</strong>
-          <div>
-            <button type="button" class="btn btn-gris btn-pequeno btn-agregar-opcion" data-p="${pIndex}">+ Respuesta</button>
-            ${
-              borradorPreguntas.length > 1
-                ? `<button type="button" class="btn btn-rojo btn-pequeno btn-quitar-pregunta" data-p="${pIndex}">Quitar</button>`
-                : ""
-            }
+            <div class="campo campo-enunciado">
+              <input type="text" class="input-pregunta-texto" data-p="${p}"
+                value="${escapeHtml(preg.texto)}"
+                placeholder="Escribe el enunciado de la pregunta"
+                aria-label="Enunciado de la pregunta ${p + 1}" />
+            </div>
+            <div class="lista-opciones-editor">${opcionesHtml}</div>
           </div>
-        </div>
-        <div class="campo" style="margin-top:8px;">
-          <input
-            type="text"
-            class="input-pregunta-texto"
-            data-p="${pIndex}"
-            value="${preg.texto}"
-            placeholder="Escribe el enunciado de la pregunta"
-          />
-        </div>
-        <div class="lista-opciones-editor">${opcionesHtml}</div>
-      `;
-
-      contenedorPreguntas.appendChild(caja);
-    });
-
-    contenedorPreguntas.querySelectorAll(".input-pregunta-texto").forEach((input) => {
-      input.addEventListener("input", () => {
-        const p = Number(input.dataset.p);
-        borradorPreguntas[p].texto = input.value;
-      });
-    });
-
-    contenedorPreguntas.querySelectorAll(".input-opcion-texto").forEach((input) => {
-      input.addEventListener("input", () => {
-        const p = Number(input.dataset.p);
-        const o = Number(input.dataset.o);
-        borradorPreguntas[p].opciones[o].texto = input.value;
-      });
-    });
-
-    contenedorPreguntas.querySelectorAll(".radio-opcion-correcta").forEach((radio) => {
-      radio.addEventListener("change", () => {
-        const p = Number(radio.dataset.p);
-        const o = Number(radio.dataset.o);
-        borradorPreguntas[p].opciones.forEach((op, idx) => {
-          op.correcta = idx === o;
-        });
-      });
-    });
-
-    contenedorPreguntas.querySelectorAll(".btn-agregar-opcion").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const p = Number(btn.dataset.p);
-        const siguienteNum = borradorPreguntas[p].opciones.length + 1;
-        borradorPreguntas[p].opciones.push({
-          id: `op-${p}-${siguienteNum}-${Date.now().toString().slice(-3)}`,
-          texto: "",
-          correcta: false
-        });
-        renderConstructorPreguntas();
-      });
-    });
-
-    contenedorPreguntas.querySelectorAll(".btn-quitar-opcion").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const p = Number(btn.dataset.p);
-        const o = Number(btn.dataset.o);
-        const eraCorrecta = borradorPreguntas[p].opciones[o].correcta;
-        borradorPreguntas[p].opciones.splice(o, 1);
-        if (eraCorrecta && borradorPreguntas[p].opciones.length > 0) {
-          borradorPreguntas[p].opciones[0].correcta = true;
-        }
-        renderConstructorPreguntas();
-      });
-    });
-
-    contenedorPreguntas.querySelectorAll(".btn-quitar-pregunta").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const p = Number(btn.dataset.p);
-        borradorPreguntas.splice(p, 1);
-        renderConstructorPreguntas();
-      });
-    });
+        `;
+      })
+      .join("");
   }
+
+  // Listeners delegados: se registran una sola vez, sin importar cuántas veces se renderice.
+  contenedorPreguntas.addEventListener("input", (e) => {
+    const campo = e.target;
+    const p = Number(campo.dataset.p);
+    const o = Number(campo.dataset.o);
+
+    if (campo.classList.contains("input-pregunta-texto")) {
+      borradorPreguntas[p].texto = campo.value;
+    } else if (campo.classList.contains("input-opcion-texto")) {
+      borradorPreguntas[p].opciones[o].texto = campo.value;
+    }
+  });
+
+  contenedorPreguntas.addEventListener("change", (e) => {
+    const campo = e.target;
+    if (!campo.classList.contains("radio-opcion-correcta")) return;
+
+    const p = Number(campo.dataset.p);
+    const o = Number(campo.dataset.o);
+    borradorPreguntas[p].opciones.forEach((op, idx) => {
+      op.correcta = idx === o;
+    });
+  });
+
+  contenedorPreguntas.addEventListener("click", (e) => {
+    const boton = e.target.closest("button[data-accion]");
+    if (!boton) return;
+
+    const p = Number(boton.dataset.p);
+    const o = Number(boton.dataset.o);
+
+    if (boton.dataset.accion === "agregar-opcion") {
+      borradorPreguntas[p].opciones.push({ id: nuevoId("op"), texto: "", correcta: false });
+      renderConstructorPreguntas();
+      const inputs = contenedorPreguntas.querySelectorAll(`.input-opcion-texto[data-p="${p}"]`);
+      inputs[inputs.length - 1]?.focus();
+      return;
+    }
+
+    if (boton.dataset.accion === "quitar-opcion") {
+      const eraCorrecta = borradorPreguntas[p].opciones[o].correcta;
+      borradorPreguntas[p].opciones.splice(o, 1);
+      if (eraCorrecta && borradorPreguntas[p].opciones.length > 0) {
+        borradorPreguntas[p].opciones[0].correcta = true;
+      }
+    }
+
+    if (boton.dataset.accion === "quitar-pregunta") {
+      borradorPreguntas.splice(p, 1);
+    }
+
+    renderConstructorPreguntas();
+  });
+
+  btnAgregarPregunta.addEventListener("click", () => {
+    borradorPreguntas.push(crearPreguntaVacia());
+    renderConstructorPreguntas();
+    const inputs = contenedorPreguntas.querySelectorAll(".input-pregunta-texto");
+    inputs[inputs.length - 1]?.focus();
+  });
+
+  /* ---------- Formulario ---------- */
 
   function limpiarFormulario() {
     form.reset();
     editandoCodigoInput.value = "";
     tituloForm.textContent = "Nuevo examen";
     btnCancelar.classList.add("oculto");
-    borradorPreguntas = [crearPreguntaVacia(1)];
+    borradorPreguntas = [crearPreguntaVacia()];
     renderConstructorPreguntas();
   }
 
@@ -172,65 +174,86 @@ export function iniciarModuloExamenes(mostrarMensaje, alCambiarExamenes) {
     tiempoInput.value = examen.tiempoMinutos;
     aprobacionInput.value = examen.porcentajeAprobacion;
     descripcionInput.value = examen.descripcion;
+
     borradorPreguntas = JSON.parse(JSON.stringify(examen.preguntas || []));
     if (borradorPreguntas.length === 0) {
-      borradorPreguntas = [crearPreguntaVacia(1)];
+      borradorPreguntas = [crearPreguntaVacia()];
     }
+
     tituloForm.textContent = "Actualizar examen";
     btnCancelar.classList.remove("oculto");
     renderConstructorPreguntas();
+    tituloForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    tituloInput.focus();
   }
+
+  /* ---------- Tabla ---------- */
 
   function renderTabla() {
     const examenes = obtenerExamenes();
-    tbody.innerHTML = "";
 
     if (examenes.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6">No hay examenes registrados.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="vacio">No hay exámenes registrados.</td></tr>`;
       return;
     }
 
-    examenes.forEach((examen) => {
-      const totalPreg = Array.isArray(examen.preguntas) ? examen.preguntas.length : 0;
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${examen.codigo}</td>
-        <td>${examen.titulo}</td>
-        <td>${examen.tiempoMinutos} min</td>
-        <td>${examen.porcentajeAprobacion}%</td>
-        <td>${totalPreg}</td>
-        <td>
-          <button type="button" class="btn btn-gris btn-pequeno btn-editar">Actualizar</button>
-          <button type="button" class="btn btn-rojo btn-pequeno btn-eliminar">Eliminar</button>
-        </td>
-      `;
-
-      tr.querySelector(".btn-editar").addEventListener("click", () => {
-        cargarExamenEnFormulario(examen);
-      });
-
-      tr.querySelector(".btn-eliminar").addEventListener("click", () => {
-        const listaActual = obtenerExamenes();
-        const filtrada = listaActual.filter((ex) => ex.codigo !== examen.codigo);
-        guardarExamenes(filtrada);
-        if (editandoCodigoInput.value === examen.codigo) {
-          limpiarFormulario();
-        }
-        renderTabla();
-        if (typeof alCambiarExamenes === "function") alCambiarExamenes();
-        mostrarMensaje("Examen eliminado", "ok");
-      });
-
-      tbody.appendChild(tr);
-    });
+    tbody.innerHTML = examenes
+      .map((examen) => {
+        const totalPreg = Array.isArray(examen.preguntas) ? examen.preguntas.length : 0;
+        return `
+          <tr>
+            <td>${escapeHtml(examen.codigo)}</td>
+            <td>${escapeHtml(examen.titulo)}</td>
+            <td>${escapeHtml(examen.tiempoMinutos)} min</td>
+            <td>${escapeHtml(examen.porcentajeAprobacion)}%</td>
+            <td>${totalPreg}</td>
+            <td>
+              <div class="acciones-celda">
+                <button type="button" class="btn btn-gris btn-pequeno" data-accion="editar"
+                  data-codigo="${escapeHtml(examen.codigo)}"
+                  aria-label="Actualizar el examen ${escapeHtml(examen.titulo)}">Actualizar</button>
+                <button type="button" class="btn btn-rojo btn-pequeno" data-accion="eliminar"
+                  data-codigo="${escapeHtml(examen.codigo)}"
+                  aria-label="Eliminar el examen ${escapeHtml(examen.titulo)}">Eliminar</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
   }
 
-  btnAgregarPregunta.addEventListener("click", () => {
-    borradorPreguntas.push(crearPreguntaVacia(borradorPreguntas.length + 1));
-    renderConstructorPreguntas();
+  tbody.addEventListener("click", (e) => {
+    const boton = e.target.closest("button[data-accion]");
+    if (!boton) return;
+
+    const examenes = obtenerExamenes();
+    const examen = examenes.find((ex) => ex.codigo === boton.dataset.codigo);
+    if (!examen) return;
+
+    if (boton.dataset.accion === "editar") {
+      cargarExamenEnFormulario(examen);
+      return;
+    }
+
+    if (boton.dataset.accion === "eliminar") {
+      if (!confirm(`¿Eliminar el examen "${examen.titulo}"? Esta acción no se puede deshacer.`)) {
+        return;
+      }
+
+      guardarExamenes(examenes.filter((ex) => ex.codigo !== examen.codigo));
+      if (editandoCodigoInput.value === examen.codigo) {
+        limpiarFormulario();
+      }
+      renderTabla();
+      notificarCambio();
+      mostrarMensaje("Examen eliminado", "ok");
+    }
   });
 
   btnCancelar.addEventListener("click", limpiarFormulario);
+
+  /* ---------- Guardar ---------- */
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -242,7 +265,14 @@ export function iniciarModuloExamenes(mostrarMensaje, alCambiarExamenes) {
     const descripcion = descripcionInput.value.trim();
     const codigoOriginal = editandoCodigoInput.value.trim();
 
-    if (!codigo || !titulo || !descripcion || tiempoMinutos <= 0 || porcentajeAprobacion <= 0 || porcentajeAprobacion > 100) {
+    if (
+      !codigo ||
+      !titulo ||
+      !descripcion ||
+      !(tiempoMinutos > 0) ||
+      !(porcentajeAprobacion > 0) ||
+      porcentajeAprobacion > 100
+    ) {
       mostrarMensaje("Revisa los datos del examen (tiempo mayor a 0 y porcentaje entre 1 y 100)", "error");
       return;
     }
@@ -251,6 +281,7 @@ export function iniciarModuloExamenes(mostrarMensaje, alCambiarExamenes) {
     for (let i = 0; i < borradorPreguntas.length; i += 1) {
       const p = borradorPreguntas[i];
       const textoPregunta = p.texto.trim();
+
       if (!textoPregunta) {
         mostrarMensaje(`La pregunta ${i + 1} no tiene enunciado`, "error");
         return;
@@ -258,26 +289,25 @@ export function iniciarModuloExamenes(mostrarMensaje, alCambiarExamenes) {
 
       const opcionesLimpias = p.opciones
         .map((op, idx) => ({
-          id: op.id || `op-${i}-${idx}`,
+          id: op.id || nuevoId(`op${idx}`),
           texto: op.texto.trim(),
           correcta: Boolean(op.correcta)
         }))
         .filter((op) => op.texto.length > 0);
 
       if (opcionesLimpias.length < 2) {
-        mostrarMensaje(`La pregunta ${i + 1} necesita al menos 2 respuestas`, "error");
+        mostrarMensaje(`La pregunta ${i + 1} necesita al menos 2 respuestas con texto`, "error");
         return;
       }
 
       const correctasCount = opcionesLimpias.filter((op) => op.correcta).length;
       if (correctasCount !== 1) {
-        opcionesLimpias.forEach((op, idx) => {
-          op.correcta = idx === 0;
-        });
+        mostrarMensaje(`La pregunta ${i + 1} debe tener exactamente una respuesta correcta con texto`, "error");
+        return;
       }
 
       preguntasLimpias.push({
-        id: p.id || `preg-${i + 1}`,
+        id: p.id || nuevoId("preg"),
         texto: textoPregunta,
         opciones: opcionesLimpias
       });
@@ -293,7 +323,7 @@ export function iniciarModuloExamenes(mostrarMensaje, alCambiarExamenes) {
       (ex) => ex.codigo === codigo && ex.codigo !== codigoOriginal
     );
     if (codigoRepetido) {
-      mostrarMensaje("Ya existe un examen con ese codigo", "error");
+      mostrarMensaje("Ya existe un examen con ese código", "error");
       return;
     }
 
@@ -307,10 +337,7 @@ export function iniciarModuloExamenes(mostrarMensaje, alCambiarExamenes) {
     };
 
     if (codigoOriginal) {
-      const actualizada = examenes.map((ex) =>
-        ex.codigo === codigoOriginal ? nuevoExamen : ex
-      );
-      guardarExamenes(actualizada);
+      guardarExamenes(examenes.map((ex) => (ex.codigo === codigoOriginal ? nuevoExamen : ex)));
       mostrarMensaje("Examen actualizado", "ok");
     } else {
       examenes.push(nuevoExamen);
@@ -320,7 +347,7 @@ export function iniciarModuloExamenes(mostrarMensaje, alCambiarExamenes) {
 
     limpiarFormulario();
     renderTabla();
-    if (typeof alCambiarExamenes === "function") alCambiarExamenes();
+    notificarCambio();
   });
 
   renderConstructorPreguntas();

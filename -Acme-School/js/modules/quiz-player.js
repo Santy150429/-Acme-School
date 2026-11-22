@@ -1,5 +1,6 @@
 
 import { obtenerExamenes, guardarResultado } from "../storage/database.js";
+import { escapeHtml } from "../utils/escape.js";
 
 export function iniciarModuloResolucion(mostrarMensaje) {
   const catalogoDiv = document.getElementById("lista-examenes");
@@ -27,15 +28,17 @@ export function iniciarModuloResolucion(mostrarMensaje) {
   let examenTerminado = false;
 
   function mostrarPaso(paso) {
-    catalogoDiv.classList.add("oculto");
-    registroDiv.classList.add("oculto");
-    pantallaExamenDiv.classList.add("oculto");
-    pantallaResultadoDiv.classList.add("oculto");
+    catalogoDiv.classList.toggle("oculto", paso !== "catalogo");
+    registroDiv.classList.toggle("oculto", paso !== "registro");
+    pantallaExamenDiv.classList.toggle("oculto", paso !== "examen");
+    pantallaResultadoDiv.classList.toggle("oculto", paso !== "resultado");
 
-    if (paso === "catalogo") catalogoDiv.classList.remove("oculto");
-    if (paso === "registro") registroDiv.classList.remove("oculto");
-    if (paso === "examen") pantallaExamenDiv.classList.remove("oculto");
-    if (paso === "resultado") pantallaResultadoDiv.classList.remove("oculto");
+    window.scrollTo({ top: 0 });
+
+    // Se mueve el foco al inicio de cada paso para quienes usan teclado o lector de pantalla.
+    if (paso === "registro") estudianteIdInput.focus();
+    if (paso === "examen") tituloExamenActivo.focus();
+    if (paso === "resultado") tituloResultado.focus();
   }
 
   function renderCatalogo() {
@@ -49,7 +52,7 @@ export function iniciarModuloResolucion(mostrarMensaje) {
     catalogoDiv.innerHTML = "";
 
     if (examenes.length === 0) {
-      catalogoDiv.innerHTML = `<div class="tarjeta"><p>No hay examenes disponibles por el momento.</p></div>`;
+      catalogoDiv.innerHTML = `<div class="tarjeta"><p>No hay exámenes disponibles por el momento.</p></div>`;
       return;
     }
 
@@ -58,7 +61,7 @@ export function iniciarModuloResolucion(mostrarMensaje) {
       card.datos = examen;
       card.addEventListener("seleccionar-examen", (ev) => {
         examenSeleccionado = ev.detail.examen;
-        examenElegidoTexto.textContent = `${examenSeleccionado.titulo} (${examenSeleccionado.tiempoMinutos} min - Minimo ${examenSeleccionado.porcentajeAprobacion}%)`;
+        examenElegidoTexto.textContent = `${examenSeleccionado.titulo} (${examenSeleccionado.tiempoMinutos} min - Mínimo ${examenSeleccionado.porcentajeAprobacion}%)`;
         formEstudiante.reset();
         mostrarPaso("registro");
       });
@@ -71,26 +74,22 @@ export function iniciarModuloResolucion(mostrarMensaje) {
     preguntasResolverDiv.innerHTML = "";
 
     preguntas.forEach((preg, idx) => {
-      const tarjeta = document.createElement("div");
+      const tarjeta = document.createElement("fieldset");
       tarjeta.className = "tarjeta-pregunta";
 
       const opcionesHtml = preg.opciones
         .map(
           (op) => `
             <label class="opcion-label">
-              <input
-                type="radio"
-                name="respuesta-${preg.id}"
-                value="${op.id}"
-              />
-              <span>${op.texto}</span>
+              <input type="radio" name="pregunta-${idx}" value="${escapeHtml(op.id)}" />
+              <span>${escapeHtml(op.texto)}</span>
             </label>
           `
         )
         .join("");
 
       tarjeta.innerHTML = `
-        <p style="margin:0 0 8px;font-weight:bold;">${idx + 1}. ${preg.texto}</p>
+        <legend>${idx + 1}. ${escapeHtml(preg.texto)}</legend>
         ${opcionesHtml}
       `;
 
@@ -107,8 +106,8 @@ export function iniciarModuloResolucion(mostrarMensaje) {
     let aciertos = 0;
     const respuestasRegistradas = [];
 
-    preguntas.forEach((preg) => {
-      const seleccionada = formResolver.querySelector(`input[name="respuesta-${preg.id}"]:checked`);
+    preguntas.forEach((preg, idx) => {
+      const seleccionada = formResolver.querySelector(`input[name="pregunta-${idx}"]:checked`);
       const opcionId = seleccionada ? seleccionada.value : null;
       const opcionObj = preg.opciones.find((o) => o.id === opcionId) || null;
       const esCorrecta = Boolean(opcionObj && opcionObj.correcta);
@@ -123,8 +122,10 @@ export function iniciarModuloResolucion(mostrarMensaje) {
     });
 
     const total = preguntas.length;
-    const porcentaje = total > 0 ? Math.round((aciertos / total) * 100) : 0;
-    const aprobo = porcentaje >= Number(examenSeleccionado.porcentajeAprobacion);
+    const requerido = Number(examenSeleccionado.porcentajeAprobacion);
+    // Un decimal: el porcentaje mostrado y la decisión de aprobar siempre coinciden.
+    const porcentaje = total > 0 ? Number(((aciertos / total) * 100).toFixed(1)) : 0;
+    const aprobo = porcentaje >= requerido;
 
     guardarResultado({
       codigoExamen: examenSeleccionado.codigo,
@@ -134,26 +135,33 @@ export function iniciarModuloResolucion(mostrarMensaje) {
       aciertos,
       totalPreguntas: total,
       porcentajeObtenido: porcentaje,
-      porcentajeRequerido: Number(examenSeleccionado.porcentajeAprobacion),
+      porcentajeRequerido: requerido,
       aprobado: aprobo,
       respuestas: respuestasRegistradas,
       fecha: new Date().toISOString()
     });
 
-    tituloResultado.innerHTML = aprobo
-      ? `Examen APROBADO <span class="aprobado-texto">Aprobado</span>`
-      : `Examen NO APROBADO <span class="reprobado-texto">No aprobado</span>`;
+    tituloResultado.textContent = aprobo ? "¡Examen aprobado!" : "Examen no aprobado";
 
     detalleResultado.innerHTML = `
-      ${motivoAutomatico ? "<p><strong>El tiempo se agoto y el examen se envio automaticamente.</strong></p>" : ""}
-      <p><strong>Estudiante:</strong> ${datosEstudiante.nombre} (ID: ${datosEstudiante.identificacion})</p>
-      <p><strong>Examen:</strong> ${examenSeleccionado.titulo}</p>
-      <p><strong>Aciertos:</strong> ${aciertos} de ${total}</p>
-      <p><strong>Porcentaje obtenido:</strong> ${porcentaje}% (Requerido: ${examenSeleccionado.porcentajeAprobacion}%)</p>
+      ${motivoAutomatico ? `<p><strong>El tiempo se agotó y el examen se envió automáticamente.</strong></p>` : ""}
+      <div class="resultado-porcentaje ${aprobo ? "ok" : "error"}">${porcentaje}%</div>
+      <p>
+        <span class="${aprobo ? "aprobado-texto" : "reprobado-texto"}">${aprobo ? "Aprobado" : "No aprobado"}</span>
+      </p>
+      <div class="resultado-datos">
+        <p><strong>Estudiante:</strong> ${escapeHtml(datosEstudiante.nombre)} (ID: ${escapeHtml(datosEstudiante.identificacion)})</p>
+        <p><strong>Examen:</strong> ${escapeHtml(examenSeleccionado.titulo)}</p>
+        <p><strong>Respuestas acertadas:</strong> ${aciertos} de ${total}</p>
+        <p><strong>Porcentaje requerido:</strong> ${requerido}%</p>
+      </div>
     `;
 
     mostrarPaso("resultado");
-    mostrarMensaje(aprobo ? "Felicitaciones, aprobaste el examen" : "No alcanzaste el porcentaje minimo", aprobo ? "ok" : "error");
+    mostrarMensaje(
+      aprobo ? "Felicitaciones, aprobaste el examen" : "No alcanzaste el porcentaje mínimo",
+      aprobo ? "ok" : "error"
+    );
   }
 
   btnVolverCatalogo.addEventListener("click", renderCatalogo);
@@ -164,7 +172,7 @@ export function iniciarModuloResolucion(mostrarMensaje) {
     const nombre = estudianteNombreInput.value.trim();
 
     if (!identificacion || !nombre) {
-      mostrarMensaje("Ingresa tu numero de identificacion y nombre completo", "error");
+      mostrarMensaje("Ingresa tu número de identificación y nombre completo", "error");
       return;
     }
 
@@ -172,7 +180,7 @@ export function iniciarModuloResolucion(mostrarMensaje) {
     examenTerminado = false;
 
     tituloExamenActivo.textContent = examenSeleccionado.titulo;
-    infoExamenActivo.textContent = `Estudiante: ${nombre} (${identificacion}) | Total preguntas: ${(examenSeleccionado.preguntas || []).length} | Aprobacion minima: ${examenSeleccionado.porcentajeAprobacion}%`;
+    infoExamenActivo.textContent = `Estudiante: ${nombre} (${identificacion}) | Total de preguntas: ${(examenSeleccionado.preguntas || []).length} | Aprobación mínima: ${examenSeleccionado.porcentajeAprobacion}%`;
 
     renderPreguntasExamen();
     mostrarPaso("examen");
@@ -181,6 +189,16 @@ export function iniciarModuloResolucion(mostrarMensaje) {
 
   formResolver.addEventListener("submit", (e) => {
     e.preventDefault();
+
+    const total = (examenSeleccionado.preguntas || []).length;
+    const respondidas = formResolver.querySelectorAll("input[type='radio']:checked").length;
+    const sinResponder = total - respondidas;
+
+    if (sinResponder > 0) {
+      const mensaje = `Te falta${sinResponder === 1 ? "" : "n"} ${sinResponder} pregunta${sinResponder === 1 ? "" : "s"} por responder. ¿Terminar de todos modos?`;
+      if (!confirm(mensaje)) return;
+    }
+
     calificarYFinalizar(false);
   });
 
@@ -191,6 +209,8 @@ export function iniciarModuloResolucion(mostrarMensaje) {
   btnFinalExamen.addEventListener("click", renderCatalogo);
 
   return {
-    refrescarCatalogo: renderCatalogo
+    refrescarCatalogo: renderCatalogo,
+    // true mientras el estudiante está resolviendo (reloj corriendo y sin terminar).
+    examenEnCurso: () => Boolean(examenSeleccionado && datosEstudiante && !examenTerminado)
   };
 }

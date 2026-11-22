@@ -1,8 +1,28 @@
 
+import { escapeHtml } from "../utils/escape.js";
+
 class AcmeNavbar extends HTMLElement {
   constructor() {
     super();
     this.usuario = null;
+    this.vistaActiva = "vista-examenes";
+
+    // Un solo listener delegado: sigue funcionando aunque render() reemplace el HTML.
+    this.addEventListener("click", (ev) => {
+      const boton = ev.target.closest("button");
+      if (!boton) return;
+
+      if (boton.dataset.ir) {
+        this.dispatchEvent(
+          new CustomEvent("navegar", {
+            detail: { vista: boton.dataset.ir },
+            bubbles: true
+          })
+        );
+      } else if (boton.id === "btn-salir") {
+        this.dispatchEvent(new CustomEvent("cerrar-sesion", { bubbles: true }));
+      }
+    });
   }
 
   connectedCallback() {
@@ -14,47 +34,44 @@ class AcmeNavbar extends HTMLElement {
     this.render();
   }
 
+  setActivo(idVista) {
+    this.vistaActiva = idVista;
+    this.render();
+  }
+
+  botonNavegacion(idVista, texto, claseExtra = "") {
+    const activo = this.vistaActiva === idVista;
+    return `
+      <button type="button"
+        class="nav-btn ${claseExtra} ${activo ? "activo" : ""}"
+        data-ir="${idVista}"
+        ${activo ? 'aria-current="page"' : ""}>${texto}</button>
+    `;
+  }
+
   render() {
     const estaLogueado = Boolean(this.usuario);
 
+    const opcionesPrivadas = estaLogueado
+      ? `
+        ${this.botonNavegacion("vista-usuarios", "Usuarios")}
+        ${this.botonNavegacion("vista-gestion-examenes", "Gestión de exámenes")}
+        <span class="nav-usuario">${escapeHtml(this.usuario.nombre)} (${escapeHtml(this.usuario.cargo)})</span>
+        <button type="button" id="btn-salir" class="nav-btn nav-btn-salir">Salir</button>
+      `
+      : this.botonNavegacion("vista-login", "Login", "nav-btn-acento");
+
     this.innerHTML = `
-      <nav style="background:#1e3a8a;color:#ffffff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div style="font-weight:bold;font-size:1.1rem;">Acme School</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <button type="button" data-ir="vista-examenes" style="padding:7px 12px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;background:#eff6ff;color:#1e3a8a;">Examenes</button>
-          ${
-            estaLogueado
-              ? `
-                <button type="button" data-ir="vista-usuarios" style="padding:7px 12px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;background:#eff6ff;color:#1e3a8a;">Usuarios</button>
-                <button type="button" data-ir="vista-gestion-examenes" style="padding:7px 12px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;background:#eff6ff;color:#1e3a8a;">Gestion Examenes</button>
-                <span style="font-size:0.85rem;padding:0 6px;">${this.usuario.nombre} (${this.usuario.cargo})</span>
-                <button type="button" id="btn-salir" style="padding:7px 12px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;background:#dc2626;color:#ffffff;">Salir</button>
-              `
-              : `
-                <button type="button" data-ir="vista-login" style="padding:7px 12px;border:none;border-radius:6px;cursor:pointer;font-weight:bold;background:#2563eb;color:#ffffff;">Login</button>
-              `
-          }
+      <nav class="nav" aria-label="Navegación principal">
+        <div class="nav-contenido">
+          <span class="nav-marca">Acme School</span>
+          <div class="nav-acciones">
+            ${this.botonNavegacion("vista-examenes", "Exámenes")}
+            ${opcionesPrivadas}
+          </div>
         </div>
       </nav>
     `;
-
-    this.querySelectorAll("button[data-ir]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        this.dispatchEvent(new CustomEvent("navegar", {
-          detail: { vista: btn.dataset.ir },
-          bubbles: true
-        }));
-      });
-    });
-
-    const btnSalir = this.querySelector("#btn-salir");
-    if (btnSalir) {
-      btnSalir.addEventListener("click", () => {
-        this.dispatchEvent(new CustomEvent("cerrar-sesion", {
-          bubbles: true
-        }));
-      });
-    }
   }
 }
 

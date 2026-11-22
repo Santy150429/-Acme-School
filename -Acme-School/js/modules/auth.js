@@ -13,7 +13,7 @@ export function iniciarLogin(alAutenticar, mostrarMensaje) {
     const password = passwordInput.value;
 
     if (!email || !password) {
-      mostrarMensaje("Completa correo y contrasena", "error");
+      mostrarMensaje("Completa correo y contraseña", "error");
       return;
     }
 
@@ -23,7 +23,9 @@ export function iniciarLogin(alAutenticar, mostrarMensaje) {
     );
 
     if (!encontrado) {
-      mostrarMensaje("Correo o contrasena incorrectos", "error");
+      mostrarMensaje("Correo o contraseña incorrectos", "error");
+      passwordInput.value = "";
+      passwordInput.focus();
       return;
     }
 
@@ -39,7 +41,7 @@ export function iniciarLogin(alAutenticar, mostrarMensaje) {
 
 export function cerrarSesion(alCerrar, mostrarMensaje) {
   cerrarSesionStorage();
-  mostrarMensaje("Sesion cerrada", "ok");
+  mostrarMensaje("Sesión cerrada", "ok");
   if (typeof alCerrar === "function") {
     alCerrar();
   }

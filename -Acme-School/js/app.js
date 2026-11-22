@@ -10,6 +10,9 @@ import { iniciarModuloResolucion } from "./modules/quiz-player.js";
 
 const VISTAS_PRIVADAS = ["vista-usuarios", "vista-gestion-examenes"];
 
+const navbar = document.getElementById("navbar");
+const modulos = {};
+
 function mostrarMensaje(texto, tipo = "ok") {
   const caja = document.getElementById("mensajes");
   const aviso = document.createElement("div");
@@ -22,11 +25,18 @@ function mostrarMensaje(texto, tipo = "ok") {
   }, 3000);
 }
 
-function mostrarVista(idVista, moduloResolucion, moduloUsuarios, moduloExamenes) {
+// Si hay un examen en curso, se pide confirmación antes de salir de él.
+function confirmarSalidaDeExamen() {
+  if (!modulos.resolucion.examenEnCurso()) return true;
+  return confirm("Tienes un examen en curso. Si sales ahora perderás tus respuestas. ¿Quieres salir?");
+}
+
+function mostrarVista(idVista) {
   const sesion = obtenerSesion();
 
+  // Protección de módulos privados: sin sesión se redirige al login.
   if (VISTAS_PRIVADAS.includes(idVista) && !sesion) {
-    mostrarMensaje("Debes iniciar sesion para acceder a este modulo", "error");
+    mostrarMensaje("Debes iniciar sesión para acceder a este módulo", "error");
     idVista = "vista-login";
   }
 
@@ -36,58 +46,59 @@ function mostrarVista(idVista, moduloResolucion, moduloUsuarios, moduloExamenes)
 
   const destino = document.getElementById(idVista) || document.getElementById("vista-examenes");
   destino.classList.remove("oculto");
+  navbar.setActivo(destino.id);
 
-  if (destino.id === "vista-examenes" && moduloResolucion) {
-    moduloResolucion.refrescarCatalogo();
-  }
-  if (destino.id === "vista-usuarios" && moduloUsuarios) {
-    moduloUsuarios.refrescarUsuarios();
-  }
-  if (destino.id === "vista-gestion-examenes" && moduloExamenes) {
-    moduloExamenes.refrescarExamenes();
-  }
+  if (destino.id === "vista-examenes") modulos.resolucion.refrescarCatalogo();
+  if (destino.id === "vista-usuarios") modulos.usuarios.refrescarUsuarios();
+  if (destino.id === "vista-gestion-examenes") modulos.examenes.refrescarExamenes();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function iniciarAplicacion() {
   iniciarBaseDatos();
+  navbar.setUsuario(obtenerSesion());
 
-  const navbar = document.getElementById("navbar");
-  let sesionActual = obtenerSesion();
-  navbar.setUsuario(sesionActual);
+  modulos.resolucion = iniciarModuloResolucion(mostrarMensaje);
 
-  let moduloResolucion = null;
-  let moduloUsuarios = null;
-  let moduloExamenes = null;
-
-  moduloResolucion = iniciarModuloResolucion(mostrarMensaje);
-
-  moduloUsuarios = iniciarModuloUsuarios(mostrarMensaje);
-
-  moduloExamenes = iniciarModuloExamenes(mostrarMensaje, () => {
-    moduloResolucion.refrescarCatalogo();
+  modulos.usuarios = iniciarModuloUsuarios(mostrarMensaje, () => {
+    navbar.setUsuario(obtenerSesion());
   });
 
-  iniciarLogin(
-    (usuario) => {
-      sesionActual = usuario;
-      navbar.setUsuario(sesionActual);
-      mostrarVista("vista-gestion-examenes", moduloResolucion, moduloUsuarios, moduloExamenes);
-    },
-    mostrarMensaje
-  );
+  modulos.examenes = iniciarModuloExamenes(mostrarMensaje, () => {
+    modulos.resolucion.refrescarCatalogo();
+  });
+
+  iniciarLogin((usuario) => {
+    navbar.setUsuario(usuario);
+    mostrarVista("vista-gestion-examenes");
+  }, mostrarMensaje);
 
   navbar.addEventListener("navegar", (ev) => {
-    const destino = ev.detail.vista;
-    mostrarVista(destino, moduloResolucion, moduloUsuarios, moduloExamenes);
+    if (!confirmarSalidaDeExamen()) return;
+    mostrarVista(ev.detail.vista);
   });
 
   navbar.addEventListener("cerrar-sesion", () => {
+    if (!confirmarSalidaDeExamen()) return;
     cerrarSesion(() => {
-      sesionActual = null;
       navbar.setUsuario(null);
-      mostrarVista("vista-login", moduloResolucion, moduloUsuarios, moduloExamenes);
+      mostrarVista("vista-login");
     }, mostrarMensaje);
   });
 
-  mostrarVista("vista-examenes", moduloResolucion, moduloUsuarios, moduloExamenes);
-});
+  // Avisa si se intenta cerrar o recargar la pestaña durante un examen.
+  window.addEventListener("beforeunload", (ev) => {
+    if (modulos.resolucion.examenEnCurso()) {
+      ev.preventDefault();
+      ev.returnValue = "";
+    }
+  });
+
+  // Errores de localStorage (por ejemplo, almacenamiento lleno).
+  document.addEventListener("almacenamiento-error", (ev) => {
+    mostrarMensaje(ev.detail.mensaje, "error");
+  });
+
+  mostrarVista("vista-examenes");
+}
+
+iniciarAplicacion();

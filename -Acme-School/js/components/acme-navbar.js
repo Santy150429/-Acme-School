@@ -1,4 +1,3 @@
-
 import { escapeHtml } from "../utils/escape.js";
 
 class AcmeNavbar extends HTMLElement {

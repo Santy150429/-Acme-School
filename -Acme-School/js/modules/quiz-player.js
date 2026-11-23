@@ -1,4 +1,3 @@
-
 import { obtenerExamenes, guardarResultado } from "../storage/database.js";
 import { escapeHtml } from "../utils/escape.js";
 

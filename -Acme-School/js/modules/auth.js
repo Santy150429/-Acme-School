@@ -1,4 +1,3 @@
-
 import { obtenerUsuarios, guardarSesion, cerrarSesionStorage } from "../storage/database.js";
 
 export function iniciarLogin(alAutenticar, mostrarMensaje) {

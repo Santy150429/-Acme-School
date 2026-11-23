@@ -1,4 +1,3 @@
-
 const PLANTILLA = `
   <style>
     :host { display: inline-block; }

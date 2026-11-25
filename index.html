@@ -1,0 +1,280 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Plataforma de exámenes en línea de Acme School" />
+  <title>Acme School - Exámenes</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+  <acme-navbar id="navbar"></acme-navbar>
+
+  <div id="mensajes" class="mensajes-box" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <p class="aviso aviso-error">Esta aplicación necesita JavaScript para funcionar.</p>
+  </noscript>
+
+  <main id="contenido" class="contenedor">
+
+    <!-- RESOLUCIÓN DE EXÁMENES (PÚBLICO, SIN LOGIN; RESULTADOS SOLO PARA SESIÓN ACTIVA) -->
+    <section id="vista-examenes" class="vista" aria-label="Resolución de exámenes">
+      <div class="encabezado-seccion">
+        <h1>Exámenes disponibles</h1>
+        <p>Elige un examen, ingresa tus datos y responde las preguntas.</p>
+      </div>
+
+      <div id="lista-examenes" class="grid-tarjetas"></div>
+
+      <!-- RESULTADOS DE LOS EXÁMENES PRESENTADOS POR LOS ESTUDIANTES -->
+      <div id="seccion-resultados" class="tarjeta tarjeta-resultados oculto">
+        <h2>Resultados de los exámenes</h2>
+        <p>Calificaciones de los estudiantes que han presentado un examen.</p>
+        <div class="tabla-scroll">
+          <table>
+            <caption class="sr-only">Resultados de los exámenes</caption>
+            <thead>
+              <tr>
+                <th scope="col">Identificación</th>
+                <th scope="col">Estudiante</th>
+                <th scope="col">Examen</th>
+                <th scope="col">Calificación</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Fecha</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-resultados"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="registro-estudiante" class="tarjeta caja-pequena oculto">
+        <h2>Datos del estudiante</h2>
+        <p>Examen elegido: <strong id="examen-elegido-texto"></strong></p>
+
+        <form id="form-estudiante" class="formulario">
+          <div class="campo">
+            <label for="estudiante-id">Número de identificación</label>
+            <input type="text" id="estudiante-id" autocomplete="off" required />
+          </div>
+
+          <div class="campo">
+            <label for="estudiante-nombre">Nombre completo</label>
+            <input type="text" id="estudiante-nombre" autocomplete="off" required />
+          </div>
+
+          <div class="acciones-form">
+            <button type="button" id="btn-volver-catalogo" class="btn btn-gris">Volver</button>
+            <button type="submit" class="btn btn-azul">Empezar examen</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="pantalla-examen" class="oculto">
+        <div class="tarjeta barra-examen">
+          <div>
+            <h2 id="titulo-examen-activo" tabindex="-1"></h2>
+            <p id="info-examen-activo"></p>
+          </div>
+          <exam-timer id="reloj-examen"></exam-timer>
+        </div>
+
+        <form id="form-resolver-examen" aria-label="Preguntas del examen">
+          <div id="preguntas-resolver"></div>
+          <div class="acciones-form">
+            <button type="submit" class="btn btn-azul">Terminar</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="pantalla-resultado" class="tarjeta resultado oculto" aria-live="polite">
+        <h2 id="titulo-resultado" tabindex="-1"></h2>
+        <div id="detalle-resultado"></div>
+        <button type="button" id="btn-final-examen" class="btn btn-azul">Volver a exámenes</button>
+      </div>
+    </section>
+
+    <!-- LOGIN (VISTA INICIAL DE LOS MÓDULOS PRIVADOS) -->
+    <section id="vista-login" class="vista oculto" aria-label="Inicio de sesión">
+      <div class="tarjeta caja-pequena">
+        <h1>Iniciar sesión</h1>
+        <p>Ingresa con tu correo y contraseña para administrar usuarios y exámenes.</p>
+
+        <form id="form-login" class="formulario">
+          <div class="campo">
+            <label for="login-email">Correo</label>
+            <input type="email" id="login-email" autocomplete="username" required />
+          </div>
+
+          <div class="campo">
+            <label for="login-password">Contraseña</label>
+            <input type="password" id="login-password" autocomplete="current-password" required />
+          </div>
+
+          <button type="submit" class="btn btn-azul">Entrar</button>
+        </form>
+
+        <p class="ayuda-login">Demo: admin@acme.edu / admin123</p>
+      </div>
+    </section>
+
+    <!-- GESTIÓN DE USUARIOS (CRUD PRIVADO) -->
+    <section id="vista-usuarios" class="vista oculto" aria-label="Gestión de usuarios">
+      <div class="encabezado-seccion">
+        <h1>Gestión de usuarios</h1>
+        <p>Crear, actualizar y eliminar usuarios (Administrativo o Docente).</p>
+      </div>
+
+      <div class="grid-crud">
+        <div class="tarjeta">
+          <h2 id="titulo-form-usuario">Nuevo usuario</h2>
+          <form id="form-usuario" class="formulario">
+            <input type="hidden" id="usuario-editando-id" />
+
+            <div class="campo">
+              <label for="usuario-id">Número de identificación</label>
+              <input type="text" id="usuario-id" required />
+            </div>
+
+            <div class="campo">
+              <label for="usuario-nombre">Nombre completo</label>
+              <input type="text" id="usuario-nombre" required />
+            </div>
+
+            <div class="campo">
+              <label for="usuario-email">Email</label>
+              <input type="email" id="usuario-email" required />
+            </div>
+
+            <div class="campo">
+              <label for="usuario-telefono">Teléfono</label>
+              <input type="tel" id="usuario-telefono" required />
+            </div>
+
+            <div class="campo">
+              <label for="usuario-cargo">Cargo</label>
+              <select id="usuario-cargo" required>
+                <option value="">Selecciona un cargo</option>
+                <option value="Administrativo">Administrativo</option>
+                <option value="Docente">Docente</option>
+              </select>
+            </div>
+
+            <div class="campo">
+              <label for="usuario-password">Contraseña</label>
+              <input type="password" id="usuario-password" autocomplete="new-password" required />
+            </div>
+
+            <div class="acciones-form">
+              <button type="submit" class="btn btn-azul">Guardar</button>
+              <button type="button" id="btn-cancelar-usuario" class="btn btn-gris oculto">Cancelar</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Usuarios registrados</h2>
+          <div class="tabla-scroll">
+            <table>
+              <caption class="sr-only">Usuarios registrados</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Identificación</th>
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Teléfono</th>
+                  <th scope="col">Cargo</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-usuarios"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GESTIÓN DE EXÁMENES (CRUD PRIVADO) -->
+    <section id="vista-gestion-examenes" class="vista oculto" aria-label="Gestión de exámenes">
+      <div class="encabezado-seccion">
+        <h1>Gestión de exámenes</h1>
+        <p>Crea y edita exámenes, preguntas y respuestas (solo una respuesta correcta por pregunta).</p>
+      </div>
+
+      <div class="grid-crud">
+        <div class="tarjeta">
+          <h2 id="titulo-form-examen">Nuevo examen</h2>
+          <form id="form-examen" class="formulario">
+            <input type="hidden" id="examen-editando-codigo" />
+
+            <div class="campo">
+              <label for="examen-codigo">Código</label>
+              <input type="text" id="examen-codigo" required />
+            </div>
+
+            <div class="campo">
+              <label for="examen-titulo">Título</label>
+              <input type="text" id="examen-titulo" required />
+            </div>
+
+            <div class="campo">
+              <label for="examen-tiempo">Tiempo (minutos)</label>
+              <input type="number" id="examen-tiempo" min="1" required />
+            </div>
+
+            <div class="campo">
+              <label for="examen-aprobacion">Porcentaje de aprobación (%)</label>
+              <input type="number" id="examen-aprobacion" min="1" max="100" required />
+            </div>
+
+            <div class="campo">
+              <label for="examen-descripcion">Descripción del examen</label>
+              <textarea id="examen-descripcion" rows="2" required></textarea>
+            </div>
+
+            <div class="constructor-preguntas">
+              <div class="fila-entre">
+                <strong>Preguntas</strong>
+                <button type="button" id="btn-agregar-pregunta" class="btn btn-gris btn-pequeno">+ Pregunta</button>
+              </div>
+              <div id="lista-constructor-preguntas"></div>
+            </div>
+
+            <div class="acciones-form">
+              <button type="submit" class="btn btn-azul">Guardar examen</button>
+              <button type="button" id="btn-cancelar-examen" class="btn btn-gris oculto">Cancelar</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Exámenes registrados</h2>
+          <div class="tabla-scroll">
+            <table>
+              <caption class="sr-only">Exámenes registrados</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Código</th>
+                  <th scope="col">Título</th>
+                  <th scope="col">Tiempo</th>
+                  <th scope="col">Aprobación</th>
+                  <th scope="col">Preguntas</th>
+                  <th scope="col">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-examenes"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
